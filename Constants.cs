@@ -1,10 +1,8 @@
-﻿using Sandbox.Game;
-using Sandbox.ModAPI;
+﻿using Sandbox.ModAPI;
 using System.Collections.Generic;
 using System.Linq;
 using VRage.Game;
 using VRage.Game.ModAPI;
-using VRage.Utils;
 
 namespace avaness.AdminTimers
 {
@@ -18,6 +16,8 @@ namespace avaness.AdminTimers
         public const int maxCmdLen = 32;
 
         public const ushort chatPacket = 10665;
+        
+        public const long noFactionId = long.MaxValue;
 
         public static IMyPlayer GetPlayer(ulong steamId)
         {

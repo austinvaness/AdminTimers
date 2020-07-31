@@ -1,3 +1,3 @@
 AssemblyInfo.cs 
-obj
-bin
+obj 
+bin 

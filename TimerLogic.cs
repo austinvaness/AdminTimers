@@ -1,13 +1,11 @@
 ﻿using Sandbox.Common.ObjectBuilders;
 using Sandbox.ModAPI;
 using SpaceEngineers.Game.ModAPI;
-using System;
 using System.Text;
 using VRage.Game.Components;
 using VRage.Game.ModAPI;
 using VRage.ModAPI;
 using VRage.ObjectBuilders;
-using VRage.Utils;
 
 namespace avaness.AdminTimers
 {
@@ -17,6 +15,7 @@ namespace avaness.AdminTimers
         private IMyTimerBlock block;
         private bool adminOwned;
         private string cmd;
+        private IMyFaction fac;
         private bool fake;
 
         public override void Init(MyObjectBuilder_EntityBase objectBuilder)
@@ -42,7 +41,12 @@ namespace avaness.AdminTimers
             if(cmd != null)
             {
                 sb.Append("Chat command:").AppendLine();
-                sb.Append(cmd).AppendLine();
+                sb.Append("//").Append(cmd).AppendLine();
+                if(fac != null)
+                {
+                    sb.AppendLine("Faction:");
+                    sb.AppendLine(fac.Name);
+                }
             }
         }
 
@@ -63,8 +67,14 @@ namespace avaness.AdminTimers
                 return;
 
             string s = block.CustomName;
+            if (!TryParseCmd(s))
+                TryParseFCmd(s);
+        }
+
+        private bool TryParseCmd(string s)
+        {
             int start = s.IndexOf("[cmd:");
-            if(start > 0)
+            if (start > 0)
             {
                 int end = s.IndexOf(']', start);
                 if (end > 0)
@@ -73,17 +83,63 @@ namespace avaness.AdminTimers
                     if (len > 0)
                     {
                         string cmd = s.Substring(start + 5, len).TrimStart(' ', '/').TrimEnd().ToLower();
-                        if(cmd.Length > 0 && cmd.Length <= Constants.maxCmdLen)
+                        if (cmd.Length > 0 && cmd.Length <= Constants.maxCmdLen)
                         {
-                            this.cmd = "//" + cmd;
+                            this.cmd = cmd;
+                            fac = null;
                             block.RefreshCustomInfo();
-                            if(!fake)
-                                MySession.Instance.Register(this.cmd, this.block);
-                            return;
+                            if (!fake)
+                                MySession.Instance.Register(this.cmd, block);
+                            return true;
                         }
                     }
                 }
             }
+            return false;
+        }
+
+        private bool TryParseFCmd(string s)
+        {
+            int start = s.IndexOf("[fcmd:");
+            if (start > 0 && start + 6 < s.Length)
+            {
+                start += 6;
+                int mid = s.IndexOf(':', start);
+                if(mid > 0 && mid + 1 < s.Length)
+                {
+                    mid++;
+                    int end = s.IndexOf(']', mid);
+                    if (end > 0)
+                    {
+                        int tagLen = mid - start - 1;
+                        if(tagLen > 0)
+                        {
+                            string tag = s.Substring(start, tagLen).Trim();
+                            int cmdLen = end - mid;
+                            if(tag.Length > 0 && cmdLen > 0)
+                            {
+                                string cmd = s.Substring(mid, cmdLen).TrimStart(' ', '/').TrimEnd().ToLower();
+                                if(cmd.Length > 0 && cmd.Length <= Constants.maxCmdLen)
+                                {
+                                    IMyFaction fac = MyAPIGateway.Session.Factions.TryGetFactionByTag(tag);
+                                    if(fac != null)
+                                    {
+                                        this.cmd = cmd;
+                                        this.fac = fac;
+                                        block.RefreshCustomInfo();
+                                        if (!fake)
+                                            MySession.Instance.Register(this.cmd, block, fac.FactionId);
+                                        return true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            //try { throw new Exception(); } catch { } // dnSpy breakpoint
+            return false;
         }
 
         private void Unregister()
@@ -91,7 +147,12 @@ namespace avaness.AdminTimers
             if (cmd != null)
             {
                 if(!fake)
-                    MySession.Instance.Unregister(cmd, block);
+                {
+                    if(fac == null)
+                        MySession.Instance.Unregister(cmd, block);
+                    else
+                        MySession.Instance.Unregister(cmd, block, fac.FactionId);
+                }
                 cmd = null;
                 block.RefreshCustomInfo();
             }
