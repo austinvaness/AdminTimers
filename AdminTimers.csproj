@@ -98,7 +98,12 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ChatMessage.cs" />
+    <Compile Include="CommandProgramBlock.cs" />
+    <Compile Include="CommandTimer.cs" />
     <Compile Include="Constants.cs" />
+    <Compile Include="ICommandBlock.cs" />
+    <Compile Include="CommandBlockLogic.cs" />
+    <Compile Include="ProgramBlockLogic.cs" />
     <Compile Include="MySession.cs" />
     <Compile Include="TimerLogic.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

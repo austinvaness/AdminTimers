@@ -14,27 +14,28 @@ namespace avaness.AdminTimers
     {
         public static MySession Instance;
 
-        private readonly Dictionary<long, Dictionary<string, HashSet<IMyTimerBlock>>> timers = new Dictionary<long, Dictionary<string, HashSet<IMyTimerBlock>>>();
+        private readonly Dictionary<long, Dictionary<string, HashSet<ICommandBlock>>> timers = new Dictionary<long, Dictionary<string, HashSet<ICommandBlock>>>();
         private bool init = false;
+        private readonly char[] space = new char[] { ' ' };
 
         public MySession()
         {
             Instance = this;
         }
 
-        public void Register(string cmd, IMyTimerBlock timer, long fId = Constants.noFactionId)
+        public void Register(string cmd, ICommandBlock timer, long fId = Constants.noFactionId)
         {
-            Dictionary<string, HashSet<IMyTimerBlock>> faction;
+            Dictionary<string, HashSet<ICommandBlock>> faction;
             if (timers.TryGetValue(fId, out faction))
             {
-                HashSet<IMyTimerBlock> timers;
+                HashSet<ICommandBlock> timers;
                 if(faction.TryGetValue(cmd, out timers))
                 {
                     timers.Add(timer);
                 }
                 else
                 {
-                    faction[cmd] = new HashSet<IMyTimerBlock>()
+                    faction[cmd] = new HashSet<ICommandBlock>()
                     {
                         timer
                     };
@@ -42,19 +43,19 @@ namespace avaness.AdminTimers
             }
             else
             {
-                timers[fId] = new Dictionary<string, HashSet<IMyTimerBlock>>()
+                timers[fId] = new Dictionary<string, HashSet<ICommandBlock>>()
                 {
-                    { cmd, new HashSet<IMyTimerBlock>() { timer } }
+                    { cmd, new HashSet<ICommandBlock>() { timer } }
                 };
             }
         }
 
-        public void Unregister(string cmd, IMyTimerBlock timer, long fId = Constants.noFactionId)
+        public void Unregister(string cmd, ICommandBlock timer, long fId = Constants.noFactionId)
         {
-            Dictionary<string, HashSet<IMyTimerBlock>> faction;
+            Dictionary<string, HashSet<ICommandBlock>> faction;
             if (timers.TryGetValue(fId, out faction))
             {
-                HashSet<IMyTimerBlock> timers;
+                HashSet<ICommandBlock> timers;
                 if (faction.TryGetValue(cmd, out timers))
                 {
                     timers.Remove(timer);
@@ -66,9 +67,9 @@ namespace avaness.AdminTimers
             }
         }
 
-        private bool TryGetValue(string cmd, out HashSet<IMyTimerBlock> timers, long fId = Constants.noFactionId)
+        private bool TryGetValue(string cmd, out HashSet<ICommandBlock> timers, long fId = Constants.noFactionId)
         {
-            Dictionary<string, HashSet<IMyTimerBlock>> faction;
+            Dictionary<string, HashSet<ICommandBlock>> faction;
             if (this.timers.TryGetValue(fId, out faction) && faction.TryGetValue(cmd, out timers))
                 return true;
 
@@ -134,7 +135,6 @@ namespace avaness.AdminTimers
                     PrintCmds(sb, ref count, Constants.noFactionId, "Admin:");
 
                     IMyFaction fac = MyAPIGateway.Session.Factions.TryGetPlayerFaction(sender.IdentityId);
-                    Dictionary<string, HashSet<IMyTimerBlock>> fCmds;
                     if (fac != null)
                         PrintCmds(sb, ref count, fac.FactionId, "Faction:");
 
@@ -152,7 +152,7 @@ namespace avaness.AdminTimers
                         return;
                     }
 
-                    string[] args = msg.Split(new[] { ' ' }, 2);
+                    string[] args = msg.Split(space, 2, StringSplitOptions.RemoveEmptyEntries);
                     if (args.Length < 2)
                     {
                         Notify("Usage: /cmd command_name", sender);
@@ -170,7 +170,7 @@ namespace avaness.AdminTimers
                         return;
                     }
 
-                    string[] args = msg.Split(new[] { ' ' }, 3);
+                    string[] args = msg.Split(space, 3, StringSplitOptions.RemoveEmptyEntries);
                     if (args.Length < 3)
                     {
                         Notify("Usage: /fcmd faction_tag command_name", sender);
@@ -233,7 +233,7 @@ namespace avaness.AdminTimers
 
         private void PrintCmds(StringBuilder sb, ref int count, long fId = Constants.noFactionId, string label = null)
         {
-            Dictionary<string, HashSet<IMyTimerBlock>> cmdList;
+            Dictionary<string, HashSet<ICommandBlock>> cmdList;
             if (timers.TryGetValue(fId, out cmdList))
             {
                 if(label != null)
@@ -256,11 +256,27 @@ namespace avaness.AdminTimers
 
         private bool TryTriggerTimers(IMyPlayer p, string cmd, long fId = Constants.noFactionId)
         {
-            HashSet<IMyTimerBlock> temp;
+            string[] args = cmd.Split(space, 2, StringSplitOptions.RemoveEmptyEntries);
+            if (args.Length == 0)
+            {
+                Notify("An unknown error occurred.", p);
+                return true;
+            }
+
+            cmd = args[0];
+            string arg = null;
+            if (args.Length > 1)
+                arg = args[1];
+
+            HashSet<ICommandBlock> temp;
             if(TryGetValue(cmd.TrimStart('/').ToLower(), out temp, fId))
             {
-                foreach (IMyTimerBlock t in temp)
-                    t.Trigger();
+                foreach (ICommandBlock t in temp)
+                {
+                    if(t.IsFunctional)
+                        t.Trigger(arg);
+                }
+
                 Notify(temp.Count + " timers triggered.", p);
                 return true;
             }
